@@ -1,0 +1,43 @@
+name: tick
+# 인스타 카드뉴스 클라우드 발행 — PC 없이 하루 10편(09시부터 60분 이상 간격).
+# GitHub 예약(schedule)은 잘 안 돌아서 믿지 않고, 회차가 끝날 때 다음 회차를 직접 부른다(사슬, 쓰레드 tick 과 같은 방식).
+# 기다리는 동안은 environment wait timer(러너 없이 대기) — wait1·wait5·wait30·wait120, 바로 = now.
+on:
+  workflow_dispatch:
+    inputs:
+      wait:
+        description: 'wait1 / wait5 / wait30 / wait120 / now'
+        default: 'wait5'
+      dry:
+        description: '1 = 컨테이너까지만(발행 안 함)'
+        default: ''
+  schedule:
+    - cron: '17,47 * * * *'   # 사슬이 끊겼을 때 다시 잇는 보조
+concurrency:
+  group: tick
+  cancel-in-progress: false
+permissions:
+  actions: write
+  contents: write
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.wait || 'now' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: check
+        id: c
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          TZ: Asia/Seoul
+          PYTHONIOENCODING: utf-8
+        run: python3 cloud/tick.py ${{ inputs.dry == '1' && '--dry' || '' }}
+      - name: next
+        if: always() && inputs.dry != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run tick.yml -R "$GITHUB_REPOSITORY" -f wait="${{ steps.c.outputs.next || 'wait5' }}"

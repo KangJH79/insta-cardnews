@@ -1,0 +1,8 @@
+{
+ "posts_per_day": 10,
+ "start": "09:00",
+ "end": "21:00",
+ "min_gap_minutes": 60,
+ "max_fail_per_day": 3,
+ "handle": "freecreator0719"
+}
