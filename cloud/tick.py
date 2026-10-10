@@ -16,9 +16,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-KST = ZoneInfo("Asia/Seoul")
+KST = dt.timezone(dt.timedelta(hours=9))  # 한국 = 서머타임 없음(윈도우엔 tzdata 가 없어 고정 +9)
 ROOT = Path(__file__).resolve().parent.parent
 ST = ROOT / "state"
 REPO = os.environ.get("GITHUB_REPOSITORY", "KangJH79/insta-cardnews")
@@ -234,4 +233,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--test" in sys.argv:  # 시각 무시하고 첫 '준비' 글로 컨테이너까지만(발행 안 함)
+        DRY = True
+        it = next(it for it in jl("queue.json", []) if it.get("status") == "ready")
+        print("시험", it["id"], publish(it))
+    else:
+        main()
