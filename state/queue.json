@@ -276,7 +276,9 @@
   "cards": 4,
   "made": "2026-10-13T02:23",
   "status": "ready",
-  "category": "정책"
+  "category": "정책",
+  "format": "reel",
+  "thumb_offset_ms": 1000
  },
  {
   "id": "20261013-09",
@@ -285,7 +287,8 @@
   "cards": 4,
   "made": "2026-10-13T02:24",
   "status": "ready",
-  "category": "지원금"
+  "category": "지원금",
+  "format": "carousel"
  },
  {
   "id": "20261013-10",
@@ -294,6 +297,8 @@
   "cards": 4,
   "made": "2026-10-13T02:24",
   "status": "ready",
-  "category": "지원금"
+  "category": "지원금",
+  "format": "reel",
+  "thumb_offset_ms": 1000
  }
 ]
