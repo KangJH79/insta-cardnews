@@ -109,7 +109,43 @@ def head_ok(u):
         return False
 
 
+def head_size(u):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(u, method="HEAD"), timeout=30) as r:
+            return int(r.headers.get("Content-Length") or 0) if r.status == 200 else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def publish_reel(item):
+    """★2026-10-14 릴스(비팔로워 통로) — video_url = media 브랜치 raw 주소.
+    (10-14 실측: raw 는 mp4 를 application/octet-stream 으로 주지만 인스타가 받아 FINISHED · graph.instagram.com 은
+     upload_type=resumable 을 안 받음 'video_url is required') · 처리 대기 최대 5분."""
+    url = f"https://raw.githubusercontent.com/{REPO}/media/{item['id']}/reel.mp4"
+    size = head_size(url)
+    if size < 100_000:
+        raise IGErr(f"릴스 파일 주소 안 열림·너무 작음({size}B)", "media")
+    cid = api("POST", f"{UID}/media", media_type="REELS", video_url=url, caption=item["caption"],
+              share_to_feed="true", thumb_offset=str(item.get("thumb_offset_ms") or 1000))["id"]
+    wait_ready(cid, tries=100)
+    if DRY:
+        print(f"DRY: 릴스 컨테이너 FINISHED({size // 1024}KB) — 발행 안 함")
+        return None
+    mid = api("POST", f"{UID}/media_publish", creation_id=cid)["id"]
+    info = api("GET", mid, fields="permalink,timestamp,caption,media_product_type")
+    return {"id": item["id"], "media_id": mid, "permalink": info.get("permalink"), "format": "reel",
+            "published_at": dt.datetime.now(KST).isoformat(timespec="seconds"), "cards": item["cards"],
+            "caption_ok": (info.get("caption") or "").strip() == item["caption"].strip()}
+
+
 def publish(item):
+    if item.get("format") == "reel":
+        try:
+            return publish_reel(item)
+        except IGErr as e:
+            if e.code in (190, 10, 200, 4, 17, 32, 613) or "limit" in str(e).lower():
+                raise
+            print(f"릴스 실패 → 같은 글을 카드(캐러셀)로: {e}")
     urls = [f"https://raw.githubusercontent.com/{REPO}/media/{item['id']}/{i:02d}.jpg" for i in range(1, item["cards"] + 1)]
     bad = [u for u in urls if not head_ok(u)]
     if bad:
@@ -125,7 +161,7 @@ def publish(item):
     mid = api("POST", f"{UID}/media_publish", creation_id=parent)["id"]
     info = api("GET", mid, fields="permalink,timestamp,caption,children{id}")
     n = len((info.get("children") or {}).get("data", []))
-    return {"id": item["id"], "media_id": mid, "permalink": info.get("permalink"),
+    return {"id": item["id"], "media_id": mid, "permalink": info.get("permalink"), "format": "carousel",
             "published_at": dt.datetime.now(KST).isoformat(timespec="seconds"), "cards": n,
             "caption_ok": (info.get("caption") or "").strip() == item["caption"].strip()}
 
@@ -204,7 +240,7 @@ def main():
                         if blk:
                             js("blocked.json", {})
                         commit(f"published {item['id']}")
-                        msg = f"발행 {item['id']} {rec['permalink']} ({rec['cards']}장, 본문 일치 {rec['caption_ok']})"
+                        msg = f"발행 {item['id']} {rec.get('format')} {rec['permalink']} ({rec['cards']}장, 본문 일치 {rec['caption_ok']})"
                         due = dt.datetime.now(KST) + GAP
                     else:
                         msg = "DRY 끝"
